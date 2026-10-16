@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Gestisci le quote dell'abbonamento Spotify Family: registra i versamenti e vedi subito quanti mesi ha pagato ogni persona.">
+<title>Quote Spotify Family</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f6f5c'/%3E%3Cpath d='M8 20h4v4H8zm6-6h4v10h-4zm6-6h4v16h-4z' fill='white'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: registro di famiglia — modulo di versamento in alto, schede persona con striscia dei mesi, storico in fondo */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#18211f; --muted:#5d6b67; --line:#d9e0dd;
+  --accent:#1f6f5c; --accent-ink:#ffffff; --paid:#2f9a7d; --paid-soft:#d6efe7;
+  --late:#b4441f; --late-soft:#f8e2d8; --ahead:#2c5d8f; --ahead-soft:#dde8f4; --empty:#e8ecea;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111715; --surface:#19211e; --ink:#e6ece9; --muted:#97a6a1; --line:#2c3733;
+  --accent:#4fbf9f; --accent-ink:#0c1512; --paid:#4fbf9f; --paid-soft:#173b31;
+  --late:#f08a64; --late-soft:#45241a; --ahead:#7fb0e0; --ahead-soft:#1b2c3e; --empty:#232d29; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111715; --surface:#19211e; --ink:#e6ece9; --muted:#97a6a1; --line:#2c3733;
+  --accent:#4fbf9f; --accent-ink:#0c1512; --paid:#4fbf9f; --paid-soft:#173b31;
+  --late:#f08a64; --late-soft:#45241a; --ahead:#7fb0e0; --ahead-soft:#1b2c3e; --empty:#232d29; color-scheme:dark}
+*{box-sizing:border-box}
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+h1,h2{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(28px,5vw,40px);font-weight:700;line-height:1.1}
+h2{font-size:20px;font-weight:700}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.label{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:500}
+header{display:grid;gap:10px}
+.plan{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted)}
+.plan b{color:var(--ink);font-weight:600}
+.summary{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:500;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip.ok{background:var(--paid-soft);color:var(--paid)}
+.chip.late{background:var(--late-soft);color:var(--late)}
+.chip.ahead{background:var(--ahead-soft);color:var(--ahead)}
+.chip.none{background:var(--empty);color:var(--muted)}
+
+/* Form versamento */
+.pay{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:16px}
+.fields{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:12px}
+.fields .wide{grid-column:1/-1}
+label.f{display:grid;gap:5px;min-width:0}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.amount{position:relative}
+.amount input{padding-right:34px;font-family:var(--mono)}
+.amount span{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.quick{display:flex;flex-wrap:wrap;gap:6px}
+.quick button{font:inherit;font-size:13px;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:4px 11px;cursor:pointer}
+.quick button:hover{border-color:var(--accent);color:var(--accent)}
+.preview{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;border-top:1px dashed var(--line)}
+.preview p{margin:0;max-width:60ch}
+.preview strong{font-weight:600}
+.btn{font:inherit;font-weight:600;background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:11px 20px;cursor:pointer}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.ghost{font:inherit;font-size:13px;background:transparent;color:var(--muted);border:0;padding:4px 6px;cursor:pointer;border-radius:6px}
+.ghost:hover{color:var(--ink)}
+.ghost.danger{color:var(--late)}
+.toast{font-size:14px;color:var(--paid);min-height:1.5em}
+.toast.err{color:var(--late)}
+
+/* Persone */
+.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.person{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;align-content:start}
+.p-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.p-name{font-family:var(--display);font-size:19px;font-weight:700;line-height:1.2;overflow-wrap:anywhere}
+.p-sub{color:var(--muted);font-size:13px}
+.strip{display:grid;grid-template-columns:repeat(12,1fr);gap:3px}
+.m{display:grid;gap:3px;text-align:center}
+.m i{display:block;height:22px;border-radius:4px;background:var(--empty)}
+.m.paid i{background:var(--paid)}
+.m.owed i{background:var(--late-soft);outline:1px solid var(--late);outline-offset:-1px}
+.m.now i{box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--ink)}
+.m small{font-size:10px;color:var(--muted);text-transform:lowercase}
+.m.now small{color:var(--ink);font-weight:600}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.facts div{display:grid;gap:1px;min-width:0}
+.facts .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px}
+.edit{display:grid;gap:8px;padding-top:10px;border-top:1px dashed var(--line)}
+.edit .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.edit .acts{display:flex;justify-content:flex-end;gap:8px}
+.edit .btn{padding:8px 14px;font-size:14px}
+
+/* Storico */
+.hist-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:10px}
+.hist-head select{width:auto}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:500}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+td.note{color:var(--muted);max-width:28ch}
+.empty-state{padding:28px 18px;color:var(--muted);text-align:center}
+
+details.settings{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px}
+details.settings summary{cursor:pointer;font-weight:600}
+.set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:12px;align-items:end}
+.note-sm{font-size:13px;color:var(--muted);margin:8px 0 0;max-width:70ch}
+.banner{background:var(--late-soft);color:var(--late);border-radius:10px;padding:10px 14px;font-size:14px}
+@media (max-width:640px){
+  .fields{grid-template-columns:1fr 1fr}
+  .fields .who{grid-column:1/-1}
+  .facts{grid-template-columns:1fr 1fr}
+}
+.btn.secondary{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+footer{color:var(--muted);font-size:13px}
+footer a{color:inherit}
+@media (prefers-reduced-motion:no-preference){.m i{transition:background .2s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <span class="label">Abbonamento di famiglia</span>
+    <h1>Quote Spotify Family</h1>
+    <div class="plan">
+      <span>Piano <b class="num" id="planPrice">20,99 €</b>/mese</span>
+      <span>Quota <b class="num" id="planQuota">3,50 €</b> a testa</span>
+      <span><b id="planPeople">6</b> persone</span>
+      <span>Mese corrente: <b id="curMonth">—</b></span>
+    </div>
+    <div class="summary" id="summary"></div>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <section class="pay" id="paySection" aria-labelledby="payTitle">
+    <h2 id="payTitle">Registra un versamento</h2>
+    <form id="payForm" class="fields" autocomplete="off">
+      <label class="f who"><span class="label">Chi ha pagato</span>
+        <select id="payMember" required></select></label>
+      <label class="f"><span class="label">Importo</span>
+        <span class="amount"><input id="payAmount" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="0,00" required><span>€</span></span></label>
+      <label class="f"><span class="label">Data</span>
+        <input id="payDate" type="date" required></label>
+      <div class="quick wide" id="quick" aria-label="Importi rapidi"></div>
+      <label class="f wide"><span class="label">Nota (facoltativa)</span>
+        <input id="payNote" type="text" maxlength="120" placeholder="es. contanti, bonifico, PayPal"></label>
+    </form>
+    <div class="preview">
+      <p id="payPreview">Scegli una persona e inserisci l'importo per vedere quanti mesi copre.</p>
+      <button class="btn" id="paySubmit" form="payForm" type="submit" disabled>Registra versamento</button>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </section>
+
+  <section aria-labelledby="peopleTitle" style="display:grid;gap:14px">
+    <h2 id="peopleTitle">Situazione per persona</h2>
+    <div class="people" id="people"><div class="empty-state">Caricamento dei membri…</div></div>
+  </section>
+
+  <section aria-labelledby="histTitle" style="display:grid;gap:14px">
+    <div class="hist-head">
+      <h2 id="histTitle">Storico versamenti</h2>
+      <label class="f"><span class="label">Mostra</span>
+        <select id="histFilter"><option value="">Tutti</option></select></label>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Data</th><th>Persona</th><th class="r">Importo</th><th class="r">Mesi</th><th>Coperto fino a</th><th>Nota</th><th></th></tr></thead>
+        <tbody id="hist"><tr><td colspan="7" class="empty-state">Nessun versamento ancora. Registra il primo con il modulo qui sopra.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <details class="settings" id="settingsBox">
+    <summary>Impostazioni del piano</summary>
+    <form id="setForm" class="set-grid">
+      <label class="f"><span class="label">Prezzo mensile del piano (€)</span>
+        <input id="setPrice" type="number" step="0.01" min="0" inputmode="decimal"></label>
+      <label class="f"><span class="label">Quota a testa (€)</span>
+        <input id="setQuota" type="number" step="0.01" min="0.01" inputmode="decimal"></label>
+      <button class="btn" type="submit">Salva impostazioni</button>
+    </form>
+    <p class="note-sm">Se Spotify cambia prezzo, aggiorna qui la quota. I versamenti già registrati restano calcolati con la quota valida quando sono stati fatti; i nuovi useranno quella nuova.</p>
+    <div class="tools">
+      <button class="btn secondary" type="button" id="addMember">Aggiungi persona</button>
+    </div>
+  </details>
+
+  <details class="settings" id="backupBox">
+    <summary>Backup dei dati</summary>
+    <p class="note-sm">I dati restano solo in questo browser, su questo dispositivo. Esporta un backup ogni tanto: ti serve anche per spostare i dati su un altro telefono o computer.</p>
+    <div class="tools">
+      <button class="btn" type="button" id="exportBtn">Esporta backup (.json)</button>
+      <label class="btn secondary" for="importFile" style="display:inline-block">Importa backup</label>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
+  </details>
+
+  <footer>Progetto open source con licenza MIT. Non affiliato a Spotify.</footer>
+</div>
+
+<script>
+(function(){
+  const MESI=["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+  const $=id=>document.getElementById(id);
+  const now=new Date();
+  const curIdx=now.getFullYear()*12+now.getMonth();
+  const pad=n=>String(n).padStart(2,"0");
+  const todayStr=now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
+  const curKey=now.getFullYear()+"-"+pad(now.getMonth()+1);
+  const eur=v=>(Math.round(v*100)/100).toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+  const idxOf=k=>{const [y,m]=String(k||curKey).split("-").map(Number);return y*12+(m-1)};
+  const mLabel=i=>MESI[((i%12)+12)%12]+" "+Math.floor(i/12);
+  const mShort=i=>MESI[((i%12)+12)%12].slice(0,3);
+  const keyOf=i=>Math.floor(i/12)+"-"+pad(i%12+1);
+  const fmtDate=s=>{if(!s)return"—";const [y,m,d]=s.split("-");return d+"/"+m+"/"+y};
+  const cents=v=>Math.round(Number(v)*100);
+
+  const KEY="quote-spotify-family:v1";
+  const MAX_MEMBERS=6;
+  const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  function defaultState(){
+    const start=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0");
+    return {members:[1,2,3,4,5,6].map(i=>({id:"m"+i,name:"Persona "+i,start,order:i})),payments:[],settings:{price:20.99,quota:3.5}};
+  }
+  function isValidState(s){
+    return s&&Array.isArray(s.members)&&Array.isArray(s.payments)&&s.settings&&Number(s.settings.quota)>0
+      &&s.members.every(m=>m&&typeof m.id==="string"&&typeof m.name==="string")
+      &&s.payments.every(p=>p&&typeof p.id==="string"&&typeof p.member==="string"&&Number(p.amount)>0);
+  }
+  function load(){
+    try{const raw=localStorage.getItem(KEY);if(raw){const s=JSON.parse(raw);if(isValidState(s))return s}}catch(e){}
+    return defaultState();
+  }
+  let storageOk=true;
+  function save(){
+    try{localStorage.setItem(KEY,JSON.stringify(state));storageOk=true}
+    catch(e){storageOk=false;showBanner("Il browser non permette di salvare i dati (forse sei in navigazione privata). Le modifiche andranno perse alla chiusura: esporta un backup.")}
+  }
+  let state=load();
+  const db=true, canWrite=true;
+  let editing=null, pendingDelete=null, pendingTimer=null;
+
+  $("curMonth").textContent=mLabel(curIdx);
+  $("payDate").value=todayStr;
+
+  /* Calcolo: ogni versamento vale importo/quota "mesi-unità"; i mesi interi coprono a partire dal mese d'inizio, il resto è credito. */
+  function unitsOf(p){const q=cents(p.quota||state.settings.quota);return q>0?cents(p.amount)/q:0}
+  function memberCalc(m,extraUnits){
+    const pays=state.payments.filter(p=>p.member===m.id);
+    let units=pays.reduce((s,p)=>s+unitsOf(p),0)+(extraUnits||0);
+    const full=Math.floor(units+1e-9);
+    const rem=Math.max(0,units-full);
+    const credit=Math.round(rem*cents(state.settings.quota))/100;
+    const start=idxOf(m.start);
+    const through=full>0?start+full-1:start-1;
+    const total=pays.reduce((s,p)=>s+cents(p.amount),0)/100;
+    const diff=through-curIdx;
+    let status;
+    if(full===0&&start>curIdx) status={cls:"none",text:"Inizia a "+mLabel(start)};
+    else if(diff<0){const owed=(-diff)*state.settings.quota-credit;status={cls:"late",text:"Indietro di "+(-diff)+(-diff===1?" mese":" mesi"),owed:Math.max(0,owed)};}
+    else if(diff===0) status={cls:"ok",text:"In regola fino a "+MESI[through%12]};
+    else status={cls:"ahead",text:"Avanti di "+diff+(diff===1?" mese":" mesi")};
+    return {full,credit,through,start,total,status,count:pays.length};
+  }
+
+  function render(){
+    const s=state.settings;
+    $("planPrice").textContent=eur(s.price);
+    $("planQuota").textContent=eur(s.quota);
+    $("planPeople").textContent=state.members.length||"—";
+    const members=[...state.members].sort((a,b)=>(a.order??0)-(b.order??0)||String(a.name).localeCompare(b.name));
+    const calcs=new Map(members.map(m=>[m.id,memberCalc(m)]));
+
+    // Riepilogo
+    const sum=$("summary");sum.textContent="";
+    if(members.length){
+      const counts={ok:0,ahead:0,late:0,none:0};let owed=0;
+      calcs.forEach(c=>{counts[c.status.cls]++;owed+=c.status.owed||0});
+      const add=(cls,t)=>{const e=document.createElement("span");e.className="chip "+cls;e.textContent=t;sum.appendChild(e)};
+      if(counts.ok+counts.ahead) add("ok",(counts.ok+counts.ahead)+" in regola");
+      if(counts.late) add("late",counts.late+" indietro · mancano "+eur(owed));
+      if(counts.none) add("none",counts.none+" non ancora iniziati");
+    }
+
+    // Select persone
+    const sel=$("payMember"),prev=sel.value,hf=$("histFilter"),hprev=hf.value;
+    sel.textContent="";hf.length=1;
+    const ph=document.createElement("option");ph.value="";ph.textContent="Scegli…";sel.appendChild(ph);
+    members.forEach(m=>{const o=document.createElement("option");o.value=m.id;o.textContent=m.name;sel.appendChild(o);hf.appendChild(o.cloneNode(true))});
+    if(members.some(m=>m.id===prev)) sel.value=prev;
+    if(members.some(m=>m.id===hprev)) hf.value=hprev;
+
+    // Importi rapidi
+    const q=$("quick");q.textContent="";
+    [1,3,6,12].forEach(n=>{const b=document.createElement("button");b.type="button";b.textContent=n+(n===1?" mese":" mesi")+" · "+eur(n*s.quota);
+      b.addEventListener("click",()=>{$("payAmount").value=(Math.round(n*s.quota*100)/100).toFixed(2);updatePreview()});q.appendChild(b)});
+
+    // Schede persona
+    const box=$("people");box.textContent="";
+    if(!members.length){box.innerHTML='<div class="empty-state">Nessun membro ancora. I sei membri della famiglia compariranno qui.</div>'}
+    members.forEach(m=>{
+      const c=calcs.get(m.id);
+      const card=document.createElement("article");card.className="person";
+      const head=document.createElement("div");head.className="p-head";
+      const nm=document.createElement("div");
+      const n=document.createElement("div");n.className="p-name";n.textContent=m.name;
+      const sub=document.createElement("div");sub.className="p-sub";
+      sub.textContent=c.full>0?"Coperto fino a "+mLabel(c.through):"Nessun mese ancora pagato";
+      nm.append(n,sub);
+      const chip=document.createElement("span");chip.className="chip "+c.status.cls;chip.textContent=c.status.text;
+      head.append(nm,chip);
+      // striscia: 3 mesi indietro, 8 avanti
+      const strip=document.createElement("div");strip.className="strip";strip.setAttribute("aria-label","Mesi coperti");
+      for(let i=curIdx-3;i<=curIdx+8;i++){
+        const cell=document.createElement("div");
+        let cls="m";
+        if(i>=c.start&&i<=c.through) cls+=" paid";
+        else if(i>=c.start&&i<=curIdx) cls+=" owed";
+        if(i===curIdx) cls+=" now";
+        cell.className=cls;cell.title=mLabel(i)+(cls.includes("paid")?" · pagato":cls.includes("owed")?" · da pagare":"");
+        const bar=document.createElement("i");const lb=document.createElement("small");lb.textContent=mShort(i);
+        cell.append(bar,lb);strip.appendChild(cell);
+      }
+      const facts=document.createElement("div");facts.className="facts";
+      const fact=(l,v)=>{const d=document.createElement("div");const a=document.createElement("span");a.className="label";a.textContent=l;const b=document.createElement("span");b.className="v";b.textContent=v;d.append(a,b);facts.appendChild(d)};
+      fact("Credito",eur(c.credit));
+      fact(c.status.owed?"Da pagare":"Versato",c.status.owed?eur(c.status.owed):eur(c.total));
+      fact("Dal mese",mShort(c.start)+" "+String(Math.floor(c.start/12)).slice(2));
+      card.append(head,strip,facts);
+      if(canWrite){
+        if(editing===m.id){
+          const ed=document.createElement("form");ed.className="edit";
+          ed.innerHTML='<div class="row"><label class="f"><span class="label">Nome</span><input id="ed-name-'+m.id+'" maxlength="40" required></label><label class="f"><span class="label">Paga dal mese</span><input id="ed-start-'+m.id+'" type="month" required></label></div><div class="acts"><button type="button" class="ghost danger" data-act="remove">Rimuovi persona</button><button type="button" class="ghost" data-act="cancel">Annulla</button><button class="btn" type="submit">Salva</button></div>';
+          ed.querySelector("#ed-name-"+m.id).value=m.name;
+          ed.querySelector("#ed-start-"+m.id).value=m.start||curKey;
+          ed.querySelector('[data-act="cancel"]').addEventListener("click",()=>{editing=null;render()});
+          const rm=ed.querySelector('[data-act="remove"]');
+          rm.addEventListener("click",()=>{
+            if(rm.dataset.armed!=="1"){rm.dataset.armed="1";rm.textContent=c.count?"Conferma: elimina anche "+c.count+" versamenti":"Conferma rimozione";return}
+            state.members=state.members.filter(x=>x.id!==m.id);
+            state.payments=state.payments.filter(p=>p.member!==m.id);
+            editing=null;save();render();toast(m.name+" rimosso");
+          });
+          ed.addEventListener("submit",e=>{e.preventDefault();
+            const name=ed.querySelector("#ed-name-"+m.id).value.trim(),start=ed.querySelector("#ed-start-"+m.id).value;
+            if(!name||!start)return;
+            const t=state.members.find(x=>x.id===m.id);if(t){t.name=name;t.start=start}
+            editing=null;save();render();toast("Modifiche salvate")});
+          card.appendChild(ed);
+        }else{
+          const eb=document.createElement("button");eb.className="ghost";eb.type="button";eb.textContent="Modifica nome o mese d'inizio";eb.style.justifySelf="start";
+          eb.addEventListener("click",()=>{editing=m.id;render()});card.appendChild(eb);
+        }
+      }
+      box.appendChild(card);
+    });
+
+    renderHistory(members);
+    updatePreview();
+    if(document.activeElement!==$("setPrice")) $("setPrice").value=Number(s.price).toFixed(2);
+    if(document.activeElement!==$("setQuota")) $("setQuota").value=Number(s.quota).toFixed(2);
+  }
+
+  function renderHistory(members){
+    const names=new Map(members.map(m=>[m.id,m]));
+    const filter=$("histFilter").value;
+    // calcolo progressivo per persona in ordine cronologico
+    const sorted=[...state.payments].sort((a,b)=>(a.date||"").localeCompare(b.date||"")||(a.createdAt||0)-(b.createdAt||0));
+    const run=new Map();const after=new Map();
+    sorted.forEach(p=>{const u=(run.get(p.member)||0)+unitsOf(p);run.set(p.member,u);
+      const m=names.get(p.member);const full=Math.floor(u+1e-9);
+      after.set(p.id,m&&full>0?mLabel(idxOf(m.start)+full-1):"—")});
+    const rows=sorted.reverse().filter(p=>!filter||p.member===filter);
+    const tb=$("hist");tb.textContent="";
+    if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty-state">'+(filter?"Nessun versamento per questa persona.":"Nessun versamento ancora. Registra il primo con il modulo qui sopra.")+'</td></tr>';return}
+    rows.forEach(p=>{
+      const tr=document.createElement("tr");
+      const td=(t,cls)=>{const d=document.createElement("td");if(cls)d.className=cls;d.textContent=t;tr.appendChild(d);return d};
+      td(fmtDate(p.date),"num");
+      td(names.get(p.member)?.name||"Persona rimossa");
+      td(eur(p.amount),"r num");
+      const u=unitsOf(p);td((Math.abs(u-Math.round(u))<1e-9?"+"+Math.round(u):"+"+u.toLocaleString("it-IT",{maximumFractionDigits:2})),"r num");
+      td(after.get(p.id));
+      td(p.note||"","note");
+      const act=document.createElement("td");act.className="r";
+      if(canWrite){const b=document.createElement("button");b.type="button";b.className="ghost danger";
+        b.textContent=pendingDelete===p.id?"Conferma eliminazione":"Elimina";
+        b.addEventListener("click",()=>askDelete(p.id));act.appendChild(b)}
+      tr.appendChild(act);tb.appendChild(tr);
+    });
+  }
+
+  async function askDelete(id){
+    if(pendingDelete!==id){pendingDelete=id;clearTimeout(pendingTimer);pendingTimer=setTimeout(()=>{pendingDelete=null;render()},4000);render();return}
+    clearTimeout(pendingTimer);pendingDelete=null;
+    state.payments=state.payments.filter(p=>p.id!==id);save();render();toast("Versamento eliminato");
+  }
+
+  function updatePreview(){
+    const id=$("payMember").value,amt=Number($("payAmount").value);
+    const m=state.members.find(x=>x.id===id);
+    const btn=$("paySubmit"),pv=$("payPreview");
+    btn.disabled=!(m&&amt>0&&db&&canWrite);
+    if(!m||!(amt>0)){pv.textContent="Scegli una persona e inserisci l'importo per vedere quanti mesi copre.";return}
+    const q=cents(state.settings.quota);const units=cents(amt)/q;
+    const full=Math.floor(units+1e-9);const restCents=cents(amt)-full*q;
+    const before=memberCalc(m),after=memberCalc(m,units);
+    pv.textContent="";
+    const add=(t,b)=>{const e=document.createElement(b?"strong":"span");e.textContent=t;pv.appendChild(e)};
+    add(eur(amt)+" = ");
+    add(full+(full===1?" mese":" mesi"),true);
+    if(restCents>0) add(" + "+eur(restCents/100)+" di credito");
+    add(". "+m.name+" ");
+    if(after.full>0) {add("sarà coperto fino a ");add(mLabel(after.through),true)} else add("non copre ancora un mese intero");
+    if(after.credit>0&&after.full!==before.full+full) {}
+    if(after.credit>0) add(" (credito totale "+eur(after.credit)+")");
+    add(".");
+  }
+
+  function toast(t,err){const e=$("toast");e.textContent=t;e.className="toast"+(err?" err":"");clearTimeout(toast._t);toast._t=setTimeout(()=>{e.textContent=""},4000)}
+
+  $("payMember").addEventListener("change",updatePreview);
+  $("payAmount").addEventListener("input",updatePreview);
+  $("histFilter").addEventListener("change",()=>renderHistory([...state.members]));
+
+  $("payForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const member=$("payMember").value,amount=Math.round(Number($("payAmount").value)*100)/100;
+    const date=$("payDate").value||todayStr,note=$("payNote").value.trim();
+    if(!db||!member||!(amount>0))return;
+    state.payments.push({id:newId(),member,amount,quota:state.settings.quota,date,note,createdAt:Date.now()});
+    save();
+    const m=state.members.find(x=>x.id===member);
+    toast("Registrati "+eur(amount)+" da "+(m?m.name:"—"));
+    $("payAmount").value="";$("payNote").value="";$("payDate").value=todayStr;
+    render();
+  });
+
+  $("setForm").addEventListener("submit",e=>{
+    e.preventDefault();
+    const price=Math.round(Number($("setPrice").value)*100)/100,quota=Math.round(Number($("setQuota").value)*100)/100;
+    if(!(quota>0)){toast("La quota deve essere maggiore di zero.",true);return}
+    state.settings={price,quota};save();render();toast("Impostazioni salvate");
+  });
+
+  $("addMember").addEventListener("click",()=>{
+    if(state.members.length>=MAX_MEMBERS){toast("Il piano Family ammette al massimo "+MAX_MEMBERS+" persone.",true);return}
+    const order=Math.max(0,...state.members.map(m=>m.order||0))+1;
+    const m={id:newId(),name:"Persona "+(state.members.length+1),start:curKey,order};
+    state.members.push(m);editing=m.id;save();render();toast("Persona aggiunta: modifica nome e mese d'inizio");
+  });
+
+  $("exportBtn").addEventListener("click",()=>{
+    const blob=new Blob([JSON.stringify({app:"quote-spotify-family",version:1,exportedAt:new Date().toISOString(),...state},null,2)],{type:"application/json"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="quote-spotify-"+todayStr+".json";
+    document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+    toast("Backup esportato");
+  });
+
+  $("importFile").addEventListener("change",async e=>{
+    const f=e.target.files&&e.target.files[0];e.target.value="";
+    if(!f)return;
+    try{
+      const s=JSON.parse(await f.text());
+      if(!isValidState(s))throw new Error("formato");
+      state={members:s.members,payments:s.payments,settings:{price:Number(s.settings.price)||0,quota:Number(s.settings.quota)}};
+      editing=null;save();render();toast("Backup importato: "+state.payments.length+" versamenti");
+    }catch(err){toast("Questo file non è un backup valido di Quote Spotify Family.",true)}
+  });
+
+  function showBanner(t){const b=$("banner");b.textContent=t;b.hidden=false}
+
+  render();
+})();
+</script>
+</body>
+</html>
